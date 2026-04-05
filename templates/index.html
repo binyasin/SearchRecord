@@ -360,10 +360,12 @@
   const btnShare  = document.getElementById('btn-share');
 
   // ── Public URL (set by server) ─────────────────────────────────
-  let publicUrl = "{{ public_url }}";
+  // On cloud: public_url is set at page load (permanent URL).
+  // On local: empty at first — poll until Cloudflare tunnel is ready.
+  let publicUrl = "{{ public_url }}" || window.location.origin;
 
-  // Poll for public URL if not ready yet
-  if (!publicUrl) {
+  // Only poll if we don't already have a real URL from the server
+  if (!("{{ public_url }}")) {
     const poller = setInterval(async () => {
       try {
         const r = await fetch('/public-url');

@@ -65,8 +65,8 @@ METER_BADGE = {
     "INACTIVE": "badge-inactive",
 }
 
-# Will be set once ngrok tunnel is created
-PUBLIC_URL = None
+# Will be set once ngrok tunnel is created (or via PUBLIC_URL env var for cloud)
+PUBLIC_URL = os.environ.get("PUBLIC_URL", "")
 
 
 @app.route("/")
@@ -78,7 +78,11 @@ def index():
 
 @app.route("/public-url")
 def get_public_url():
-    return jsonify({"url": PUBLIC_URL or ""})
+    # On cloud: PUBLIC_URL env var or just use the request host (works on Render etc.)
+    # On local: return tunnel URL once it's ready
+    from flask import request as _req
+    url = PUBLIC_URL or _req.host_url.rstrip("/")
+    return jsonify({"url": url})
 
 
 @app.route("/search")
@@ -247,23 +251,28 @@ def _start_tunnel_localhostrun(port):
 
 
 if __name__ == "__main__":
-    port = 5000
+    port = int(os.environ.get("PORT", 5000))
 
-    # Redirect stdout/stderr to log file when running without a terminal
-    # (e.g. Task Scheduler / background service)
-    log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "psc_search.log")
-    if not sys.stdout.isatty():
-        log_file = open(log_path, "w", buffering=1, encoding="utf-8")
-        sys.stdout = log_file
-        sys.stderr = log_file
+    # Cloud deployment: PUBLIC_URL env var is set, skip tunnel entirely
+    if PUBLIC_URL:
+        print(f"\n  Starting PSC Search on port {port}")
+        print(f"  Public URL: {PUBLIC_URL}", flush=True)
+        app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+    else:
+        # Local mode: redirect logs and start Cloudflare tunnel
+        log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "psc_search.log")
+        if not sys.stdout.isatty():
+            log_file = open(log_path, "w", buffering=1, encoding="utf-8")
+            sys.stdout = log_file
+            sys.stderr = log_file
 
-    print(f"\n  Starting PSC Search on http://localhost:{port}")
-    print(f"  Creating public link via Cloudflare Tunnel...")
-    print(f"  Log: {log_path}", flush=True)
+        print(f"\n  Starting PSC Search on http://localhost:{port}")
+        print(f"  Creating public link via Cloudflare Tunnel...")
+        print(f"  Log: {log_path}", flush=True)
 
-    # Start Cloudflare tunnel in background thread
-    t = threading.Thread(target=start_tunnel, args=(port,), daemon=True)
-    t.start()
+        # Start Cloudflare tunnel in background thread
+        t = threading.Thread(target=start_tunnel, args=(port,), daemon=True)
+        t.start()
 
-    # Start Flask (use_reloader=False so tunnel thread isn't forked twice)
-    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+        # Start Flask (use_reloader=False so tunnel thread isn't forked twice)
+        app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
