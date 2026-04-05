@@ -248,12 +248,22 @@ def _start_tunnel_localhostrun(port):
 
 if __name__ == "__main__":
     port = 5000
+
+    # Redirect stdout/stderr to log file when running without a terminal
+    # (e.g. Task Scheduler / background service)
+    log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "psc_search.log")
+    if not sys.stdout.isatty():
+        log_file = open(log_path, "w", buffering=1, encoding="utf-8")
+        sys.stdout = log_file
+        sys.stderr = log_file
+
     print(f"\n  Starting PSC Search on http://localhost:{port}")
     print(f"  Creating public link via Cloudflare Tunnel...")
+    print(f"  Log: {log_path}", flush=True)
 
     # Start Cloudflare tunnel in background thread
     t = threading.Thread(target=start_tunnel, args=(port,), daemon=True)
     t.start()
 
-    # Start Flask (use_reloader=False so ngrok thread isn't forked twice)
+    # Start Flask (use_reloader=False so tunnel thread isn't forked twice)
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
