@@ -120,8 +120,9 @@ def start_tunnel(port):
     # Matches both trycloudflare.com and *.cfargotunnel.com URLs
     pattern = re.compile(r'https://[a-zA-Z0-9\-]+\.trycloudflare\.com')
 
+    # --protocol http2 uses TCP — avoids QUIC/UDP blocks on firewalls/routers
     cmd = ['cloudflared', 'tunnel', '--url', f'http://localhost:{port}',
-           '--no-autoupdate']
+           '--no-autoupdate', '--protocol', 'http2']
     try:
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 stdin=subprocess.DEVNULL)
@@ -147,8 +148,10 @@ def start_tunnel(port):
 
     threading.Thread(target=_reader, daemon=True).start()
 
+    url_found = None
+    connected = False
     buffer = ""
-    deadline = time.time() + 60
+    deadline = time.time() + 90
 
     while time.time() < deadline:
         try:
@@ -157,16 +160,35 @@ def start_tunnel(port):
             continue
         if chunk is None:
             break
-        buffer += chunk.decode('utf-8', errors='ignore')
-        match = pattern.search(buffer)
-        if match:
-            PUBLIC_URL = match.group(0)
+        line = chunk.decode('utf-8', errors='ignore')
+        buffer += line
+
+        if not url_found:
+            match = pattern.search(buffer)
+            if match:
+                url_found = match.group(0)
+
+        # Only announce once cloudflared confirms the connection is live
+        if url_found and ('Registered tunnel connection' in line or
+                          'Connection ' in line and 'registered' in line.lower()):
+            connected = True
+            PUBLIC_URL = url_found
             border = "=" * 58
             print(f"\n{border}", flush=True)
             print(f"  PUBLIC URL (share on WhatsApp):", flush=True)
             print(f"  {PUBLIC_URL}", flush=True)
             print(f"{border}\n", flush=True)
             return
+
+    # Fallback: if URL found but never saw connection confirmation, print anyway
+    if url_found and not connected:
+        PUBLIC_URL = url_found
+        border = "=" * 58
+        print(f"\n{border}", flush=True)
+        print(f"  PUBLIC URL (may take a moment to activate):", flush=True)
+        print(f"  {PUBLIC_URL}", flush=True)
+        print(f"{border}\n", flush=True)
+        return
 
     print("\n  Could not get public URL from cloudflared.", flush=True)
 
