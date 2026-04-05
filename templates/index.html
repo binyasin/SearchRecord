@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PSC Consumer Search</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary:   #1d4ed8;
+      --primary-h: #1e40af;
+      --green:     #16a34a;
+      --surface:   #ffffff;
+      --bg:        #f1f5f9;
+      --border:    #e2e8f0;
+      --text:      #0f172a;
+      --muted:     #64748b;
+      --radius:    10px;
+      --shadow:    0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.06);
+      --font:      Calibri, 'Segoe UI', 'Gill Sans MT', Arial, sans-serif;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 15px;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--primary);
+      color: #fff;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.18);
+      flex-wrap: wrap;
+    }
+    .header-title { display: flex; align-items: center; gap: 10px; flex: 1; }
+    header h1 { font-size: 1.3rem; font-weight: 700; letter-spacing: -.01em; font-family: var(--font); }
+    #record-count { font-size: .82rem; opacity: .75; }
+
+    /* Share button */
+    #btn-share {
+      display: flex; align-items: center; gap: 7px;
+      background: #25d366;
+      color: #fff;
+      border: none; border-radius: 8px;
+      padding: 8px 16px;
+      font-family: var(--font);
+      font-size: .9rem; font-weight: 700;
+      cursor: pointer; text-decoration: none;
+      transition: background .15s;
+      white-space: nowrap;
+    }
+    #btn-share:hover { background: #1da851; }
+    #btn-share.loading { background: #64748b; cursor: default; }
+    #btn-share svg { flex-shrink: 0; }
+
+    /* ── Search card ── */
+    .search-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+      margin: 20px auto;
+      max-width: 1140px;
+    }
+
+    .search-row {
+      display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;
+    }
+
+    .field-group { display: flex; flex-direction: column; gap: 4px; }
+    .field-group label {
+      font-size: .75rem; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .04em;
+      font-family: var(--font);
+    }
+
+    input[type=text], select, input[type=number] {
+      border: 1.5px solid var(--border);
+      border-radius: 7px;
+      padding: 9px 12px;
+      font-size: 1rem;
+      font-family: var(--font);
+      color: var(--text);
+      background: var(--surface);
+      transition: border-color .15s;
+      outline: none;
+    }
+    input[type=text]:focus, select:focus, input[type=number]:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(29,78,216,.12);
+    }
+
+    #query { flex: 1; min-width: 200px; font-size: 1.05rem; }
+    #field { min-width: 155px; }
+    #limit { width: 75px; }
+
+    .exact-wrap {
+      display: flex; align-items: center; gap: 7px;
+      padding-bottom: 9px;
+      font-size: .92rem; color: var(--muted);
+      cursor: pointer; user-select: none;
+      font-family: var(--font);
+    }
+    .exact-wrap input[type=checkbox] {
+      width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer;
+    }
+
+    button.btn-search {
+      background: var(--primary); color: #fff;
+      border: none; border-radius: 7px;
+      padding: 10px 22px;
+      font-size: 1rem; font-weight: 700;
+      font-family: var(--font);
+      cursor: pointer; transition: background .15s;
+      white-space: nowrap;
+      display: flex; align-items: center; gap: 7px;
+    }
+    button.btn-search:hover { background: var(--primary-h); }
+    button.btn-search:disabled { opacity: .6; cursor: not-allowed; }
+
+    /* ── Quick filters ── */
+    .quick-filters {
+      display: flex; gap: 7px; flex-wrap: wrap; margin-top: 13px;
+    }
+    .qlabel { font-size: .78rem; color: var(--muted); align-self: center; font-family: var(--font); }
+    .chip {
+      background: #eff6ff; color: var(--primary);
+      border: 1px solid #bfdbfe;
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: .82rem; font-weight: 600;
+      font-family: var(--font);
+      cursor: pointer; transition: background .12s;
+    }
+    .chip:hover { background: #dbeafe; }
+
+    /* ── Status bar ── */
+    #status-bar {
+      max-width: 1140px; margin: 0 auto 8px;
+      font-size: .86rem; color: var(--muted);
+      padding: 0 4px; min-height: 22px;
+      font-family: var(--font);
+    }
+
+    /* truncated banner */
+    .trunc-banner {
+      background: #fffbeb; border: 1px solid #fde68a;
+      border-radius: 7px; padding: 9px 16px;
+      font-size: .86rem; color: #92400e;
+      margin: 0 auto 10px;
+      max-width: 1140px;
+      font-family: var(--font);
+    }
+
+    /* ── Results ── */
+    .results-wrap {
+      max-width: 1140px; margin: 0 auto 40px;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%; border-collapse: collapse;
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      font-family: var(--font);
+      font-size: .9rem;
+    }
+    thead tr { background: #f8fafc; }
+    th {
+      padding: 10px 13px;
+      text-align: left;
+      font-size: .75rem; font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase; letter-spacing: .05em;
+      border-bottom: 1.5px solid var(--border);
+      white-space: nowrap;
+      font-family: var(--font);
+    }
+    td {
+      padding: 9px 13px;
+      border-bottom: 1px solid #f1f5f9;
+      white-space: nowrap;
+      color: var(--text);
+      font-family: var(--font);
+    }
+    tbody tr:hover { background: #f8faff; }
+    tbody tr:last-child td { border-bottom: none; }
+
+    td.cons-no {
+      font-weight: 700; color: var(--primary);
+      font-family: Consolas, 'Courier New', monospace;
+      font-size: .92rem;
+    }
+    td.mono { font-family: Consolas, 'Courier New', monospace; font-size: .88rem; }
+
+    /* Badges */
+    .badge {
+      display: inline-block; padding: 2px 9px;
+      border-radius: 12px;
+      font-size: .78rem; font-weight: 700;
+      font-family: var(--font);
+    }
+    .badge-amr      { background: #dcfce7; color: #15803d; }
+    .badge-nonamr   { background: #fef9c3; color: #854d0e; }
+    .badge-inactive { background: #f1f5f9; color: #64748b; }
+    .badge-active   { background: #dbeafe; color: #1d4ed8; }
+    .badge-cto      { background: #ede9fe; color: #6d28d9; }
+    .badge-three    { background: #fce7f3; color: #be185d; }
+    .badge-hook     { background: #fff7ed; color: #c2410c; }
+
+    /* ── States ── */
+    .state-box {
+      text-align: center; padding: 55px 20px;
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      max-width: 1140px; margin: 0 auto 40px;
+      font-family: var(--font);
+    }
+    .state-box .icon { font-size: 2.5rem; margin-bottom: 10px; }
+    .state-box h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 6px; font-family: var(--font); }
+    .state-box p  { color: var(--muted); font-size: .92rem; font-family: var(--font); }
+
+    .spinner {
+      width: 34px; height: 34px;
+      border: 3px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      margin: 0 auto 14px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Share toast ── */
+    #toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: #0f172a; color: #fff;
+      padding: 12px 22px; border-radius: 10px;
+      font-size: .92rem; font-family: var(--font); font-weight: 600;
+      box-shadow: 0 4px 20px rgba(0,0,0,.25);
+      opacity: 0; transition: opacity .3s;
+      pointer-events: none; z-index: 999;
+      max-width: 90vw; text-align: center;
+    }
+    #toast.show { opacity: 1; }
+
+    @media (max-width: 620px) {
+      .search-row { flex-direction: column; }
+      #query, #field, #limit, button.btn-search { width: 100%; }
+      button.btn-search { justify-content: center; }
+      header { gap: 8px; }
+      #btn-share { font-size: .82rem; padding: 7px 12px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header>
+  <div class="header-title">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+    <div>
+      <h1>PSC Consumer Search</h1>
+      <div id="record-count" style="font-size:.78rem;opacity:.7">Loading records…</div>
+    </div>
+  </div>
+
+  <!-- WhatsApp share button -->
+  <a id="btn-share" href="#" onclick="shareOnWhatsApp(event)">
+    <!-- WhatsApp icon -->
+    <svg width="18" height="18" viewBox="0 0 32 32" fill="currentColor">
+      <path d="M16 0C7.163 0 0 7.163 0 16c0 2.824.737 5.478 2.027 7.782L0 32l8.418-2.007A15.94 15.94 0 0016 32c8.837 0 16-7.163 16-16S24.837 0 16 0zm0 29.333a13.267 13.267 0 01-6.763-1.843l-.485-.288-5.003 1.194 1.216-4.878-.317-.502A13.267 13.267 0 012.667 16C2.667 8.636 8.636 2.667 16 2.667S29.333 8.636 29.333 16 23.364 29.333 16 29.333zm7.27-9.878c-.397-.199-2.35-1.159-2.715-1.292-.364-.132-.629-.199-.894.199-.264.397-1.026 1.292-1.258 1.557-.232.264-.464.298-.861.1-.397-.199-1.676-.618-3.193-1.97-1.18-1.051-1.977-2.35-2.209-2.747-.232-.397-.025-.612.174-.809.179-.178.397-.464.596-.696.199-.232.264-.397.397-.662.132-.264.066-.497-.033-.696-.1-.199-.894-2.152-1.225-2.946-.323-.774-.65-.669-.894-.681l-.762-.013c-.264 0-.696.1-1.06.497-.364.397-1.39 1.358-1.39 3.311s1.423 3.84 1.622 4.104c.199.264 2.8 4.276 6.785 5.995.948.41 1.688.654 2.265.837.952.302 1.818.26 2.503.158.764-.114 2.35-.96 2.681-1.888.331-.928.331-1.724.232-1.888-.1-.165-.364-.264-.762-.464z"/>
+    </svg>
+    Share on WhatsApp
+  </a>
+</header>
+
+<!-- ── Search card ── -->
+<div class="search-card">
+  <form id="search-form" autocomplete="off">
+    <div class="search-row">
+      <div class="field-group" style="flex:1">
+        <label for="query">Search Query</label>
+        <input id="query" type="text" placeholder="Consumer No, IBC name, DTS ID, Tariff, PMT…" autofocus />
+      </div>
+
+      <div class="field-group">
+        <label for="field">Search Field</label>
+        <select id="field">
+          {% for label, val in field_options %}
+          <option value="{{ val }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label for="limit">Limit</label>
+        <input id="limit" type="number" value="50" min="1" max="500" />
+      </div>
+
+      <label class="exact-wrap">
+        <input id="exact" type="checkbox" />
+        Exact match
+      </label>
+
+      <button type="submit" class="btn-search" id="btn-search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        Search
+      </button>
+    </div>
+
+    <!-- Quick filters -->
+    <div class="quick-filters">
+      <span class="qlabel">Quick:</span>
+      <span class="chip" data-q="AMR"      data-f="amr">AMR</span>
+      <span class="chip" data-q="NON AMR"  data-f="amr">NON AMR</span>
+      <span class="chip" data-q="Inactive" data-f="amr">Inactive</span>
+      <span class="chip" data-q="CTO"      data-f="meter_type">CTO Meters</span>
+      <span class="chip" data-q="A3-G"     data-f="tariff">Tariff A3-G</span>
+      <span class="chip" data-q="JOHAR"    data-f="ibc">JOHAR</span>
+      <span class="chip" data-q="GADAP"    data-f="ibc">GADAP</span>
+      <span class="chip" data-q="KORANGI"  data-f="ibc">KORANGI</span>
+      <span class="chip" data-q="MALIR"    data-f="ibc">MALIR</span>
+    </div>
+  </form>
+</div>
+
+<div id="status-bar"></div>
+<div id="trunc-banner" class="trunc-banner" style="display:none"></div>
+<div id="output"></div>
+<div id="toast"></div>
+
+<script>
+  // ── Elements ──────────────────────────────────────────────────
+  const form      = document.getElementById('search-form');
+  const queryEl   = document.getElementById('query');
+  const fieldEl   = document.getElementById('field');
+  const limitEl   = document.getElementById('limit');
+  const exactEl   = document.getElementById('exact');
+  const btnSearch = document.getElementById('btn-search');
+  const statusBar = document.getElementById('status-bar');
+  const output    = document.getElementById('output');
+  const banner    = document.getElementById('trunc-banner');
+  const recCount  = document.getElementById('record-count');
+  const toast     = document.getElementById('toast');
+  const btnShare  = document.getElementById('btn-share');
+
+  // ── Public URL (set by server) ─────────────────────────────────
+  let publicUrl = "{{ public_url }}";
+
+  // Poll for public URL if not ready yet
+  if (!publicUrl) {
+    const poller = setInterval(async () => {
+      try {
+        const r = await fetch('/public-url');
+        const d = await r.json();
+        if (d.url) {
+          publicUrl = d.url;
+          clearInterval(poller);
+          btnShare.classList.remove('loading');
+        }
+      } catch(e) {}
+    }, 2000);
+    btnShare.classList.add('loading');
+    btnShare.title = 'Generating public link...';
+  }
+
+  // ── WhatsApp share ─────────────────────────────────────────────
+  function shareOnWhatsApp(e) {
+    e.preventDefault();
+    if (!publicUrl) {
+      showToast('Public link not ready yet. Please wait a few seconds...');
+      return;
+    }
+    const msg = encodeURIComponent(
+      'PSC Consumer Search Tool\n' +
+      'Search consumer records by ConsumerNo, IBC, DTS, Feeder, AMR, Tariff & more.\n\n' +
+      publicUrl
+    );
+    window.open('https://wa.me/?text=' + msg, '_blank');
+  }
+
+  // ── Quick chips ────────────────────────────────────────────────
+  document.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      queryEl.value   = chip.dataset.q;
+      fieldEl.value   = chip.dataset.f || '';
+      exactEl.checked = false;
+      runSearch();
+    });
+  });
+
+  // ── Form submit ────────────────────────────────────────────────
+  form.addEventListener('submit', e => { e.preventDefault(); runSearch(); });
+
+  // ── Live debounce search ───────────────────────────────────────
+  let debounce;
+  queryEl.addEventListener('input', () => {
+    clearTimeout(debounce);
+    const v = queryEl.value.trim();
+    if (v.length >= 2) debounce = setTimeout(runSearch, 480);
+    else if (v.length === 0) clearOutput();
+  });
+
+  // ── Core search ────────────────────────────────────────────────
+  async function runSearch() {
+    const q     = queryEl.value.trim();
+    const field = fieldEl.value;
+    const limit = limitEl.value || 50;
+    const exact = exactEl.checked;
+    if (!q) { clearOutput(); return; }
+
+    btnSearch.disabled = true;
+    showLoading();
+    const params = new URLSearchParams({ q, field, limit, exact });
+    try {
+      const r    = await fetch('/search?' + params);
+      const data = await r.json();
+      renderResults(data, q);
+    } catch(err) {
+      showError('Network error - is the server running?');
+    } finally {
+      btnSearch.disabled = false;
+    }
+  }
+
+  // ── Render results ─────────────────────────────────────────────
+  function renderResults(data, q) {
+    banner.style.display = 'none';
+    if (data.error) { showError(data.error); return; }
+
+    const { results, total, truncated, field_searched,
+            columns, col_labels, amr_badge, meter_badge } = data;
+
+    if (total === 0) {
+      statusBar.textContent = `No results for "${q}" - searched in ${field_searched}`;
+      output.innerHTML = `
+        <div class="state-box">
+          <div class="icon">&#128269;</div>
+          <h3>No records found</h3>
+          <p>Try a shorter or partial value, or change the field filter.</p>
+        </div>`;
+      return;
+    }
+
+    statusBar.innerHTML =
+      `Found <strong>${total}${truncated ? '+' : ''}</strong> record${total !== 1 ? 's' : ''}` +
+      ` &nbsp;&middot;&nbsp; Field: <strong>${field_searched}</strong>`;
+
+    if (truncated) {
+      banner.style.display = 'block';
+      banner.textContent = `Showing first ${total} results. Increase the Limit to see more.`;
+    }
+
+    const thead = '<tr>' + columns.map(c =>
+      `<th>${col_labels[c] || c}</th>`
+    ).join('') + '</tr>';
+
+    const tbody = results.map(row => {
+      const cells = columns.map(col => {
+        const v = (row[col] || '').trim();
+        if (col === 'Cons_No')
+          return `<td class="cons-no">${hl(v, q)}</td>`;
+        if (col === 'AMR_STATUS') {
+          const cls = amr_badge[(v || '').toUpperCase()] || '';
+          return `<td><span class="badge ${cls}">${v || '-'}</span></td>`;
+        }
+        if (col === 'Meter_Typ') {
+          const cls = meter_badge[(v || '').toUpperCase()] || '';
+          return `<td>${v ? `<span class="badge ${cls}">${v}</span>` : '-'}</td>`;
+        }
+        if (['Meter_No','Contract_Ac','DTS_ID','FeederID'].includes(col))
+          return `<td class="mono">${hl(v, q) || '-'}</td>`;
+        return `<td>${hl(v, q) || '-'}</td>`;
+      }).join('');
+      return `<tr>${cells}</tr>`;
+    }).join('');
+
+    output.innerHTML = `
+      <div class="results-wrap">
+        <table><thead>${thead}</thead><tbody>${tbody}</tbody></table>
+      </div>`;
+  }
+
+  // ── Highlight query text ───────────────────────────────────────
+  function hl(text, q) {
+    if (!text || !q) return text;
+    const esc = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return text.replace(new RegExp(`(${esc})`, 'gi'),
+      '<mark style="background:#fef08a;border-radius:2px;padding:0 1px">$1</mark>');
+  }
+
+  function showLoading() {
+    statusBar.textContent = 'Searching...';
+    output.innerHTML = `
+      <div class="state-box">
+        <div class="spinner"></div>
+        <p>Searching records...</p>
+      </div>`;
+  }
+  function showError(msg) {
+    statusBar.textContent = '';
+    output.innerHTML = `
+      <div class="state-box">
+        <div class="icon">&#9888;&#65039;</div>
+        <h3>Error</h3><p>${msg}</p>
+      </div>`;
+  }
+  function clearOutput() {
+    statusBar.textContent = '';
+    output.innerHTML = '';
+    banner.style.display = 'none';
+  }
+
+  // ── Toast ──────────────────────────────────────────────────────
+  function showToast(msg) {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+  }
+
+  // ── Record count on load ───────────────────────────────────────
+  fetch('/search?q=AMR&field=amr&limit=1')
+    .then(r => r.json())
+    .then(() => {
+      // Get a rough total using full-text
+      return fetch('/search?q=BL&limit=500');
+    })
+    .then(r => r.json())
+    .then(d => {
+      recCount.textContent = d.truncated ? '500+ records loaded' : `${d.total} records loaded`;
+    }).catch(() => { recCount.textContent = 'Records loaded'; });
+</script>
+</body>
+</html>
